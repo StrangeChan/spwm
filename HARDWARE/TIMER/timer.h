@@ -22,5 +22,7 @@ void TIM2_PWM_Init(u16 arr,u16 psc);
 void TIM1_Init(void);
 
 void TIM4_Int_Init(u16 arr,u16 psc);
+
+void MOTOR_PWM_Init(u16 arr,u16 psc);
 extern u16 count1;
 #endif

@@ -42,7 +42,8 @@ int main(void)
  	Adc_Init();		  		//ADC初始化
     TIM3_PWM_Init(1800*2-1,0);	 //不分频。PWM频率=72000000/1800=40Khz
     TIM2_PWM_Init(1800*2-1,0);	 //不分频。PWM频率=72000000/1800=40Khz
-    TIM1_Init();
+    MOTOR_PWM_Init(1800*2-1,0);
+	//TIM1_Init();
     TIM4_Int_Init(100,71);
 	KEY_Init();         	//初始化与按键连接的硬件接口
     set_fre=50;
