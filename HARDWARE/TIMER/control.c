@@ -58,8 +58,8 @@ void TIM4_IRQHandler(void)   //TIM4ÖÐ¶Ï
 				
                 r1=r1;
                 r2=r2;
-                TIM1->CNT=0;
-				TIM3->CNT = 0;
+                ///TIM1->CNT=0;
+				//TIM3->CNT = 0;
 				TIM4->CNT = 0;
 				//TIM_SetCompare1(TIM3,900);
                 TIM_SetCompare2(TIM3,r1);

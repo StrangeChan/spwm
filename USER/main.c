@@ -48,7 +48,9 @@ int main(void)
 	KEY_Init();         	//初始化与按键连接的硬件接口
     set_fre=50;
 	
-	//Time_control=500000/(set_fre*Sample);
+	
+	
+	//Time_control=1000000/(set_fre*Sample);
 	//TIM4->ARR = 10;
 	while(1)
 	{ 
