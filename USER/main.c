@@ -1,103 +1,129 @@
-#include "led.h"
+
+#include "spwm.h"  
 #include "delay.h"
-#include "key.h"
 #include "sys.h"
-#include "control.h"
-#include "lcd.h"
-#include "usart.h"	 
+#include "usart.h"
 #include "adc.h"
-#include "timer.h"
 
- 
+#include "key.h"
+#include "lcd.h"
+extern u32 adc_cal;
+extern u32 adc_sum ;
+extern u8 adc_over_flag ;
+extern u16 adc_count ;
+extern u32 adc_ref ;
+extern uint8_t fre_out;
+u32 adcave = 0;
+u16 M_SET = 0;
+u8 key_time = 0;
+u8 keyup_flag = 0;
+u8 key_xiaodou_flag = 0;
+u16 slow_startflag=0;
+u16 slowstartcount=0;
+u8 YXJ_keydown_flag = 0;
+u8 YXJ_new_flag = 0;
+u8 change_numcount_flag = 0;
+extern u8 change_sin_m_flag;
+uint32_t sin_step_set = 0;
+uint16_t sin_num_set = 0;        //半周期计数值
+
+u16 rupt_fre[81]={
+ 0,0,0,0,0,0,0,0,0,0,			//20-29
+ 0,0,0,0,0,1,1,0,1,1,			//30-39
+ 1,1,1,1,1,1,1,1,1,1,			//40-49
+ 1,1,1,1,1,1,1,1,1,1,			//50-59
+ 1,1,1,1,1,1,1,1,1,1,			//60-69
+ 1,1,1,1,1,1,1,1,1,1,			//70-79
+ 1,1,1,1,1,1,0,1,1,0,			//80-89
+ 1,1,0,1,0,1,0,1,0,1,			//90-99
+ 0
+};
+
+
+u8 key;
+
+#define SLOWSET 500   //软起动电压设置
+#define ADC_SET 2100
+#define V_REF_SET 1199 //25v电压采样点
+#define DisableAllIRQs() __set_PRIMASK(1);__set_FAULTMASK(1)
+#define EnableAllIRQs()  __set_PRIMASK(0);__set_FAULTMASK(0)
+
+
 void oscilograph(void); 
-void ADC_get(void);
 
-u8 i=0;
-u16 adcx,ad_all;
-u16 ad[51];
-u16 x=20,y=120,y_old=0;
-u16 count1;
- 
-u16 ad_get;
-/************************************************
- ALIENTEK精英STM32开发板实验17
- ADC 实验   
- 技术支持：www.openedv.com
- 淘宝店铺：http://eboard.taobao.com 
- 关注微信公众平台微信号："正点原子"，免费获取STM32资料。
- 广州市星翼电子科技有限公司  
- 作者：正点原子 @ALIENTEK
-************************************************/
-
-   
 int main(void)
 {
-
-    vu8 key=0,len,t;	
-	delay_init();	    	 //延时函数初始化	  
-	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);//设置中断优先级分组为组2：2位抢占优先级，2位响应优先级
-	uart_init(115200);	 	//串口初始化为115200
- 	LED_Init();			     //LED端口初始化
-	LCD_Init();			 	
- 	Adc_Init();		  		//ADC初始化
-    TIM3_PWM_Init(1800*2-1,0);	 //不分频。PWM频率=72000000/1800=40Khz
-    TIM2_PWM_Init(1800*2-1,0);	 //不分频。PWM频率=72000000/1800=40Khz
-    MOTOR_PWM_Init(1800*2-1,0);
-	//TIM1_Init();
-    TIM4_Int_Init(100,71);
-	KEY_Init();         	//初始化与按键连接的硬件接口
-    set_fre=50;
+		DisableAllIRQs();   //关中断
+	  delay_init();
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);  	  //1组
 	
+		//sin_cal();
+		SPWM_Init();
+	//uart_init(9600);
+	 // TIM3_Int_Init(999,71);//1ms
+    Adc_Init();		  		//ADC初始化
+		KEY_Init();
+	//LCD_Init();
 	
+	LCD_Init();
+	  EnableAllIRQs();  //开中断
 	
-	//Time_control=1000000/(set_fre*Sample);
-	//TIM4->ARR = 10;
-	while(1)
-	{ 
+	set_fre=50;
+	
+	Time_control=20000/(set_fre)/4+rupt_fre[set_fre-20];
+	//Time_control=20000/(set_fre)/2;
+	
+	adc_count = 10000.0f/set_fre +0.4;
+		while(1)
+		{
+//			YXJ_keydown_flag = KEY_Scan(0); 			 //不可连续按的扫描模式
+//			if(YXJ_keydown_flag==1 && change_numcount_flag==0) //YXJ_UP 增加一个移相角增量
+//			{
+//				fre_out++;
+//				if(fre_out > 100)
+//				{
+//					fre_out = 100;
+//				}
+//				sin_cal();
+//			  	change_numcount_flag = 1;
+//			}
+//			if(YXJ_keydown_flag==2 && change_numcount_flag==0) //YXJ_DOWN 减少一个移相角增量
+//			{		
+//				fre_out--;
+//				if(fre_out < 20)
+//				{
+//					fre_out = 20;
+//				}			
+//				sin_cal();
+//				change_numcount_flag = 1;
+//			}			
 
-        //ADC_get();
-        oscilograph();	
-        
-
-
-        key=KEY_Scan(0);	//得到键值
-	   	if(key)
+		oscilograph();	
+		key=KEY_Scan(0);	//得到键值
+		if(key)
 		{		
 			
 			switch(key)
 			{				 
-				case WKUP_PRES:	//控制频率上升
-                    set_fre++;
-					break; 
-				case KEY1_PRES:	//控制频率为50
-					set_fre=50;
-					break;
-				case KEY0_PRES:	//控制频率下降
-					set_fre--;
-					break;
+					case WKUP_PRES:	//控制频率上升
+						set_fre++;
+						break; 
+					case KEY1_PRES:	//控制频率为50
+						set_fre=50;
+						break;
+					case KEY0_PRES:	//控制频率下降
+						set_fre--;
+						break;
 			}
-            Time_control=1000000/((set_fre+2)*Sample);
-			TIM4->ARR = Time_control;
-        }
-//        if(USART_RX_STA&0x8000)
-//		{					   
-//			len=USART_RX_STA&0x3fff;//得到此次接收到的数据长度
-//			printf("\r\n您发送的消息为:\r\n\r\n");
-//			for(t=0;t<len;t++)
-//			{
-//				USART_SendData(USART1, USART_RX_BUF[t]);//向串口1发送数据
-//				while(USART_GetFlagStatus(USART1,USART_FLAG_TC)!=SET);//等待发送结束
-//			}
-//            if (USART_RX_BUF[0]=='-')   set_speed=-(100*(USART_RX_BUF[1]-'0')+10*(USART_RX_BUF[2]-'0')+(USART_RX_BUF[3]-'0'));
-//            else set_speed=100*(USART_RX_BUF[0]-'0')+10*(USART_RX_BUF[1]-'0')+(USART_RX_BUF[2]-'0');
-//			USART_RX_STA=0;
-
-//		}
-        if (set_fre>100) set_fre=100;
-
-	}
-}
- 
+			if(set_fre>100) set_fre=100;
+			if(set_fre<20) set_fre=20;
+			
+			
+			
+			Time_control=20000/(set_fre)/4+rupt_fre[set_fre-20];
+			//Time_control=20000/(set_fre)/2;
+			adc_count = 10000.0f/set_fre +0.4;
+		}
 
 
 
@@ -105,48 +131,75 @@ int main(void)
 
 
 
-
-
-void ADC_get()
-{
-    u8 j;
-        i++;
-		adcx=Get_Adc_Average(ADC_Channel_1,3);
-        ad[i]=adcx-3000;
-        if (i==50) i=0;    
-        ad_all=0;
-        for (j=1;j<51;j++) ad_all += ad[j];
-        ad_get=(ad_all/50)+3000;
+		if(adc_over_flag==1)//99次采完了要做平均为实际的电压值
+		{
+			adc_ref = adc_sum / (adc_count<<1);
+			adcave = adc_cal / (adc_count<<1);
+			slowstartcount=0;
+        if(!slow_startflag)
+        {
+         if((adcave < SLOWSET) && (M_SET < 700))  //软启
+         {
+          M_SET += 6;
+         }
+         else
+         {
+					slow_startflag=1;
+         }
+        }				
+				if(slow_startflag)
+				{
+					if(adcave > V_REF_SET)
+					{
+						M_SET -= 4;
+					}
+					else
+					{
+						M_SET += 4;				
+					}					
+				}
+				if(M_SET > 1010)
+				{
+					M_SET = 1010;
+				}
+				if(M_SET < 200)
+				{
+					M_SET = 200;
+				}
+				adc_sum	= 0;
+				adc_cal = 0;
+				adc_over_flag=0;
+				if(change_sin_m_flag == 0)
+				{
+					change_sin_m_flag = 1;					
+				}
+			}			
+		}
 }
 
 void oscilograph()
 {
     LCD_ShowString(100,70,200,16,16,"set_fre:");
     LCD_ShowxNum(156,70,set_fre,4,16,0);//显示ADC的值
-    
-//    LCD_ShowString(100,50,200,16,16,"speed:");
-//    LCD_ShowxNum(156,50,count1,4,16,0);//显示编码1
-//    
-//    LCD_ShowString(100,30,200,16,16,"r2:");
-//    LCD_ShowxNum(156,30,r2,4,16,0);//显示编码1
-//    
-//    LCD_ShowString(100,10,200,16,16,"set:");
-//    if (set_speed<0) {LCD_ShowString(150,10,200,16,16,"-");LCD_ShowxNum(156,10,-set_speed,4,16,0);}//显示编码1
-//    else {LCD_ShowxNum(156,10,set_speed,4,16,0); LCD_ShowString(150,10,200,16,16," ");}
-//		
-//        y_old=y;
-//        if (set_speed>0) y=210-count1;
-//        if (set_speed<=0) y=210+count1;
-//        x++;
-//        if (x==250)
-//        {
-//            x=20;
-//            LCD_Clear(WHITE);
-//        }
-//        LCD_DrawLine(x-1,y_old,x,y);
-//                USART_SendData(USART1, count1);
-//        while(USART_GetFlagStatus(USART1,USART_FLAG_TC)!=SET);//等待发送结束
 }
 
 
-
+//定时器3中断服务程序
+void TIM3_IRQHandler(void)   //TIM3中断
+{
+	if (TIM_GetITStatus(TIM3, TIM_IT_Update) != RESET) //检查指定的TIM中断发生与否:TIM 中断源 
+		{
+			TIM_ClearITPendingBit(TIM3, TIM_IT_Update  );  //清除TIMx的中断待处理位:TIM 中断源 
+//			IWDG_Feed();//喂狗
+			if(keyup_flag == 1)
+			{
+				key_time++;				
+			}				
+			if(key_time == 10)
+			{
+				key_time = 0;
+				keyup_flag = 0;	
+				key_xiaodou_flag = 1;
+			}
+		}
+}
